@@ -1,0 +1,85 @@
+Number of complete TCP Flows (SYN with FIN): 3
+
+TEMPLATE: SENDER(IP:PORT) or RECEIVER(IP:PORT)
+
+TCP FLOW #1:
+TRANSACTION 1
+
+    SENDER(130.245.145.12:43498)
+
+        SEQ: 705669103, ACK: 1921750144, Window: 49152
+
+    RECEIVER(128.208.2.198:80)
+
+        SEQ: 1921750144, ACK: 705669127, Window: 49152
+
+TRANSACTION 2
+
+    SENDER(130.245.145.12:43498)
+
+        SEQ: 705669127, ACK: 1921750144, Window: 49152
+
+    RECEIVER(128.208.2.198:80)
+
+        SEQ: 1921750144, ACK: 705670575, Window: 49152
+
+
+    10320080 bytes sent in 1.9373 seconds
+
+    Total Througput: 5327141.878 bytes/second -> 5.3271 Mbps
+
+-------------------------------------------------------------
+TCP FLOW #2:
+TRANSACTION 1
+
+    SENDER(130.245.145.12:43500)
+
+        SEQ: 3636173852, ACK: 2335809728, Window: 49152
+
+    RECEIVER(128.208.2.198:80)
+
+        SEQ: 2335809728, ACK: 3636173876, Window: 49152
+
+TRANSACTION 2
+
+    SENDER(130.245.145.12:43500)
+
+        SEQ: 3636173876, ACK: 2335809728, Window: 49152
+
+    RECEIVER(128.208.2.198:80)
+
+        SEQ: 2335809728, ACK: 3636175324, Window: 49152
+
+
+    10454760 bytes sent in 8.2476 seconds
+
+    Total Througput: 1267619.6031 bytes/second -> 1.2676 Mbps
+
+-------------------------------------------------------------
+TCP FLOW #3:
+TRANSACTION 1
+
+    SENDER(130.245.145.12:43502)
+
+        SEQ: 2558634630, ACK: 3429921723, Window: 49152
+
+    RECEIVER(128.208.2.198:80)
+
+        SEQ: 3429921723, ACK: 2558634654, Window: 49152
+
+TRANSACTION 2
+
+    SENDER(130.245.145.12:43502)
+
+        SEQ: 2558634654, ACK: 3429921723, Window: 49152
+
+    RECEIVER(128.208.2.198:80)
+
+        SEQ: 3429921723, ACK: 2558636102, Window: 49152
+
+
+    1071832 bytes sent in 0.6666 seconds
+
+    Total Througput: 1607862.8116 bytes/second -> 1.6079 Mbps
+
+-------------------------------------------------------------

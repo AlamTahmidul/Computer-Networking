@@ -51,7 +51,7 @@ def parse_pcap(pcap_file_reader):
 
                     if ((tcp.flags & TH_ACK) and not (tcp.flags & TH_SYN) and not pack.fin_found): # ACK
                         pack.stor_data.append( {"TIME": timestamp, "SEQ": tcp.seq, "ACK": tcp.ack, "WINDOW_SIZE": tcp.win, "LENGTH": len(tcp), "TYPE": "ACK"} )
-                        if not pack.ac_1: # Did not receive acknowledgement yet
+                        if not pack.ac_1 and len(tcp.data) == 0: # Did not receive acknowledgement yet for 3-way handshake
                             pack.ac_1 = True
                         else:
                             pack.st += len(tcp)
@@ -91,19 +91,30 @@ def parse_pcap(pcap_file_reader):
 # Write to File the Analysis
 def analyze():
     with open("analysis.txt", "w") as f:
-        f.write("Number of complete TCP Flows (SYN with FIN): " + Packet.tcp_flows)
+        f.write("Number of complete TCP Flows (SYN with FIN): " + str(Packet.tcp_flows) + "\n")
+        f.write("\nTEMPLATE: SENDER(IP:PORT) or RECEIVER(IP:PORT)\n\n")
+        flow_num = 1
         for p in packets:
             pack: Packet = p
-            i_offset = 0
-            
-            if pack.ac_1:
-                i_offset = 1
-            
-
-
-            pass
-        pass
-
+            if pack.syn and pack.fin_found: # VALID FLOW
+                f.write(f"TCP FLOW #{str(flow_num)}:\n")
+                i_offset = 0
+                if pack.ac_1:
+                    i_offset = 1
+                
+                time = pack.rtos_data[-1]["TIME"] - pack.stor_data[0 + i_offset]["TIME"]
+                for i in range(2): # PRINT THE FIRST 2 TRANSACTIONS
+                    f.write(f"""TRANSACTION {i + 1}\n
+    SENDER({str(inet_ntoa(pack.src))}:{str(pack.sport)})\n
+        SEQ: {str(pack.stor_data[i + i_offset]["SEQ"])}, ACK: {str(pack.stor_data[i + i_offset]["ACK"])}, Window: {str(pack.stor_data[i + i_offset]["WINDOW_SIZE"] << pack.win_scale)}\n
+    RECEIVER({str(inet_ntoa(pack.dst))}:{str(pack.dport)})\n
+        SEQ: {str(pack.rtos_data[i]["SEQ"])}, ACK: {str(pack.rtos_data[i]["ACK"])}, Window: {str(pack.rtos_data[i]["WINDOW_SIZE"] << pack.win_scale)}\n\n""")
+                f.write(f"""
+    {pack.st} bytes sent in {str(round(pack.rtos_data[-1]["TIME"] - pack.stor_data[0 + i_offset]["TIME"], 4))} seconds\n
+    Total Througput: {str(round(pack.st / time, 4))} bytes/second -> {str(round(pack.st / time / 1000000, 4))} Mbps\n
+-------------------------------------------------------------\n""")
+                flow_num += 1
+    
 def run(pcap_file):
     try:
         f = open(pcap_file, 'rb')
@@ -113,16 +124,18 @@ def run(pcap_file):
     except FileNotFoundError as fe:
         print("\n" + pcap_file + " not found. Make sure your file exists, it's a .pcap file, and it's location is relative to this file.")
 
-if __name__ == "__main__":
-    # print("\nThe location of the .pcap file must be relative to the location of this (analysis_pcap_tcp.py) file. \nExample: If file.pcap file is in the same directory, then type file.pcap as the input below.\n")
-    # file_loc = input("Enter The directory of the file: ")
-    file_loc = "assignment2.pcap"
-    run(pcap_file=file_loc)
-    print(Packet.tcp_flows)
-
+def debug():
     for p in packets:
         # manual_sum = p.stor_data[-1]["SEQ"] - p.stor_data[0]["SEQ"]
         time = p.rtos_data[-1]["TIME"] - p.stor_data[1]["TIME"]
         time1 = p.stor_data[1]["TIME"] - p.syn_time
         time2 = p.rtos_data[-1]["TIME"] - p.syn_time
         print(f"Sum: {p.st},  Number of Sender Flows: {len(p.stor_data)}, Time: {time}, First Time: {time1}, Second Time: {time2}, Count: {p.count}")
+
+if __name__ == "__main__":
+    # print("\nThe location of the .pcap file must be relative to the location of this (analysis_pcap_tcp.py) file. \nExample: If file.pcap file is in the same directory, then type file.pcap as the input below.\n")
+    # file_loc = input("Enter The directory of the file: ")
+    file_loc = "assignment2.pcap"
+    run(pcap_file=file_loc)
+    debug()
+    analyze()
