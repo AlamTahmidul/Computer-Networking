@@ -133,8 +133,6 @@ def debug():
         print(f"Sum: {p.st},  Number of Sender Flows: {len(p.stor_data)}, Time: {time}, First Time: {time1}, Second Time: {time2}, Count: {p.count}")
 
 if __name__ == "__main__":
-    # print("\nThe location of the .pcap file must be relative to the location of this (analysis_pcap_tcp.py) file. \nExample: If file.pcap file is in the same directory, then type file.pcap as the input below.\n")
-    # file_loc = input("Enter The directory of the file: ")
     file_loc = "assignment2.pcap"
     run(pcap_file=file_loc)
     debug()
