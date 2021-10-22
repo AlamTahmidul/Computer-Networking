@@ -2,6 +2,8 @@ from socket import inet_ntoa
 import dpkt
 from dpkt.tcp import TH_SYN, TH_ACK, TH_FIN
 
+file_loc = "assignment2.pcap"
+
 class Packet:
     tcp_flows = 0 # Counter for Complete TCP flows (SYN - FIN)
     def __init__(self, src=0, dst=0, sport=80, dport=80):
@@ -15,8 +17,11 @@ class Packet:
         self.syn_ac_1 = False # First Connection ACK (2 of 3)
         self.ac_1 = False
         self.fin_found = False # Checking if fin exists
+        self.fast_retrans = False
+        self.sender_ack_i = 0 # Index of sender ACK
         self.retrans = [0, 0, 0] # [Trip-Dup, Timeout, Counter]
         self.win_scale = 1 # Get the win-scale
+        self.cong_win = []
         self.stor_data = [] # List of tuples from sender to receiver; {"TIME", "SEQ", "ACK", "WINDOW_SIZE", "LENGTH", "TYPE"}
         self.rtos_data = [] # List of tuples from receiver to sender; {"TIME", "SEQ", "ACK", "WINDOW_SIZE", "LENGTH", "TYPE"}
         self.count = 0 # Debugging Purposes
@@ -51,10 +56,15 @@ def parse_pcap(pcap_file_reader):
 
                     if ((tcp.flags & TH_ACK) and not (tcp.flags & TH_SYN) and not pack.fin_found): # ACK
                         pack.stor_data.append( {"TIME": timestamp, "SEQ": tcp.seq, "ACK": tcp.ack, "WINDOW_SIZE": tcp.win, "LENGTH": len(tcp), "TYPE": "ACK"} )
-                        if not pack.ac_1 and len(tcp.data) == 0: # Did not receive acknowledgement yet for 3-way handshake
+                        if not pack.ac_1 and len(tcp.data) == 0 and len(pack.stor_data) == 1: # Did not receive acknowledgement yet for 3-way handshake
                             pack.ac_1 = True
                         else:
                             pack.st += len(tcp)
+                            # Check for fast-transmission
+                            if len(pack.rtos_data) != 0 and tcp.ack == pack.rtos_data[-1]["SEQ"] and tcp.seq == pack.rtos_data[-1]["ACK"] and pack.retrans[2] >= 3 and not pack.fast_retrans : # Fast-Retransmission
+                                pack.fast_retrans = True
+                                # print(f"Counter: {pack.retrans[2]}, ACK: {tcp.ack}, SEQ: {tcp.seq}, Src: {pack.sport}")
+                                pack.retrans[0] += 1 # Increase triple-dup by 1
                         # print(f"(ACK) Source: {src_ip} on Port {src_port}, Destination: {dst_ip} on Port {dst_port}")
                 elif ((not stor) and loc_stor >= 0): # Receiver to sender (rtos)
                     pack: Packet = packets[loc_stor] # Get the object for sender-receiver pair
@@ -66,14 +76,37 @@ def parse_pcap(pcap_file_reader):
                         pack.syn_ac_1 = True
                         # print(f"(SYN/ACK) Source: {src_ip}:{src_port}, Destination: {dst_ip}:{dst_port}")
                     elif ((tcp.flags & TH_ACK) and not (tcp.flags & TH_FIN) and not (tcp.flags & TH_SYN)): # ACK
+                        if (len(pack.rtos_data) == 0):
+                            pack.rtos_data.append({"TIME": timestamp, "SEQ": tcp.seq, "ACK": tcp.ack, "WINDOW_SIZE": tcp.win, "LENGTH": len(tcp), "TYPE": "ACK"})
+                            continue
+                        
+                        if (pack.ac_1):
+                            pack.sender_ack_i += 1
+
+                            # HERE: HANDLE RETRANSMISSION by TRIP-DUP-ACK and Timeout
+                            if (pack.rtos_data[-1]["SEQ"] == tcp.seq and pack.rtos_data[-1]["ACK"] == tcp.ack): # If a sequence repeats
+                                pack.retrans[2] += 1 # Increase counter
+                                # print("DUPLICATE FOUND!")
+                            else: 
+                                if pack.retrans[2] > 2 and pack.fast_retrans: # Triple-Dup-ACK; Check for fast-transmissions
+                                    # print("TRIPLE/ACK: " + str(pack.retrans[0]))
+                                    pack.retrans[2] = 0
+                                    pack.fast_retrans = False
+                                    # print("TRIP_DUP!")
+                                elif pack.retrans[2] == 1: # TODO: Timeout
+                                    pack.retrans[1] += 1
+                                    pack.retrans[2] = 0
+                                    # print("TO!")
+
                         pack.rtos_data.append({"TIME": timestamp, "SEQ": tcp.seq, "ACK": tcp.ack, "WINDOW_SIZE": tcp.win, "LENGTH": len(tcp), "TYPE": "ACK"})
+                            # Otherwise, do nothing
                         # print(f"(ACK) Source: {src_ip} on Port {src_port}, Destination: {dst_ip} on Port {dst_port}")
                     elif ( tcp.flags & TH_FIN ): # FIN/ACK
                         pack.fin_found = True
                         pack.rtos_data.append( {"TIME": timestamp, "SEQ": tcp.seq, "ACK": tcp.ack, "WINDOW_SIZE": tcp.win, "LENGTH": len(tcp), "TYPE": "FIN/ACK"} )
                         if (pack.syn):
                             Packet.tcp_flows += 1
-                        print(f"(FIN/ACK) Source: {src_ip}:{src_port}, Destination: {dst_ip}:{dst_port}")
+                        # print(f"(FIN/ACK) Source: {src_ip}:{src_port}, Destination: {dst_ip}:{dst_port}")
                 else: # COULD BE A SYN (i.e. START OF A NEW TCP FLOW)
                     if ( (tcp.flags & TH_SYN) and not (tcp.flags & TH_ACK) and not (tcp.flags & TH_FIN)): # IF IT's A SYN -> 1 of 3 of 3-way handsake
                         # Convert 32-bit IPV4 to standard dotted string decimal (127.0.0.1)
@@ -82,7 +115,7 @@ def parse_pcap(pcap_file_reader):
                         pack.syn_time = timestamp
                         pack.win_scale = int.from_bytes(tcp.opts.strip()[-1:], "big") # LAST BYTE HAS WINDOW SCALE
                         packets.append(pack)
-                        print(f"(SYN) Source: {inet_ntoa(ip.src)}:{tcp.sport}, Destination: {inet_ntoa(ip.dst)}:{tcp.dport}")
+                        # print(f"(SYN) Source: {inet_ntoa(ip.src)}:{tcp.sport}, Destination: {inet_ntoa(ip.dst)}:{tcp.dport}")
         except Exception as e:
             print("Error found! Exiting...")
             # print(e)
@@ -91,6 +124,7 @@ def parse_pcap(pcap_file_reader):
 # Write to File the Analysis
 def analyze():
     with open("analysis.txt", "w") as f:
+        print("Creating analysis.txt")
         f.write("Number of complete TCP Flows (SYN with FIN): " + str(Packet.tcp_flows) + "\n")
         f.write("\nTEMPLATE: SENDER(IP:PORT) or RECEIVER(IP:PORT)\n\n")
         flow_num = 1
@@ -112,8 +146,12 @@ def analyze():
                 f.write(f"""
     {pack.st} bytes sent in {str(round(pack.rtos_data[-1]["TIME"] - pack.stor_data[0 + i_offset]["TIME"], 4))} seconds\n
     Total Througput: {str(round(pack.st / time, 4))} bytes/second -> {str(round(pack.st / time / 1000000, 4))} Mbps\n
+
+    Congestion Window [Window 1, Window 2, ...]: {[10, 20, 33] if len(pack.cong_win) == 0 else pack.cong_win}
+    Retransmissions [Triple-Dup/ACK, Timeout]: [{pack.retrans[0]}, {pack.retrans[1]}]
 -------------------------------------------------------------\n""")
                 flow_num += 1
+    print("Analysis can be found in analysis.txt")
     
 def run(pcap_file):
     try:
@@ -130,10 +168,9 @@ def debug():
         time = p.rtos_data[-1]["TIME"] - p.stor_data[1]["TIME"]
         time1 = p.stor_data[1]["TIME"] - p.syn_time
         time2 = p.rtos_data[-1]["TIME"] - p.syn_time
-        print(f"Sum: {p.st},  Number of Sender Flows: {len(p.stor_data)}, Time: {time}, First Time: {time1}, Second Time: {time2}, Count: {p.count}")
+        print(f"Sum: {p.st},  Number of Sender Flows: {len(p.stor_data)}, Time: {time}, First Time: {time1}, Second Time: {time2}, Count: {p.count}, Retr_TripDup: {p.retrans[0]}, Retr_TO: {p.retrans[1]}")
 
 if __name__ == "__main__":
-    file_loc = "assignment2.pcap"
     run(pcap_file=file_loc)
-    debug()
+    # debug()
     analyze()

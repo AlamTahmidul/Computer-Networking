@@ -28,6 +28,9 @@ TRANSACTION 2
 
     Total Througput: 5327141.878 bytes/second -> 5.3271 Mbps
 
+
+    Congestion Window [Window 1, Window 2, ...]: [10, 20, 33]
+    Retransmissions [Triple-Dup/ACK, Timeout]: [2, 1]
 -------------------------------------------------------------
 TCP FLOW #2:
 TRANSACTION 1
@@ -55,6 +58,9 @@ TRANSACTION 2
 
     Total Througput: 1267619.6031 bytes/second -> 1.2676 Mbps
 
+
+    Congestion Window [Window 1, Window 2, ...]: [10, 20, 33]
+    Retransmissions [Triple-Dup/ACK, Timeout]: [24, 31]
 -------------------------------------------------------------
 TCP FLOW #3:
 TRANSACTION 1
@@ -82,4 +88,7 @@ TRANSACTION 2
 
     Total Througput: 1607862.8116 bytes/second -> 1.6079 Mbps
 
+
+    Congestion Window [Window 1, Window 2, ...]: [10, 20, 33]
+    Retransmissions [Triple-Dup/ACK, Timeout]: [0, 0]
 -------------------------------------------------------------
